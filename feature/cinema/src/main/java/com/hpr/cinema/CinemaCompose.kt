@@ -1,6 +1,7 @@
 package com.hpr.cinema
 
 import android.app.Activity
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -27,14 +28,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -45,15 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.DefaultCameraDistance
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.RenderEffect
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,12 +55,11 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.hpr.core.util.addOrRemove
 import com.hpr.data.R
 import com.hpr.data.model.cinema.BuyTicketRequest
-import com.hpr.data.model.cinema.BuyTicketResponse
 import com.hpr.data.model.cinema.CinemaSeat
 import com.hpr.data.model.cinema.SeatType
+import com.hpr.data.model.cinema.WeekDay
 
 
 @Composable
@@ -80,16 +73,20 @@ fun ContainerUi(
     viewModel: CinemaViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val projectorImage = ImageBitmap.imageResource(id = R.drawable.projector)
 
     val selectedSeatList: MutableList<CinemaSeat> = remember {
         mutableStateListOf()
     }
 
-    var ticketResponse = viewModel.ticketResult.observeAsState(initial = "")
+    var isLoading by remember {
+        mutableStateOf(false)
+    }
 
-    if (ticketResponse.value.isNotEmpty()) {
-        Toast.makeText(context, ticketResponse.value, Toast.LENGTH_SHORT).show()
+    val ticketResult = viewModel.ticketResult.collectAsState("").value
+
+    if (ticketResult.isNotEmpty()) {
+        Toast.makeText(context, ticketResult, Toast.LENGTH_SHORT).show()
+        isLoading = false
     }
 
     val seatDataList = viewModel.seatDataList
@@ -149,7 +146,6 @@ fun ContainerUi(
                             if (data.seatType == SeatType.Selected)
                                 selectedSeatList.add(data)
                             else selectedSeatList.remove(data.copy(seatType = SeatType.Selected))
-                            //selectedSeatList.addOrRemove(data)
                         }
                     }
                 }
@@ -182,26 +178,35 @@ fun ContainerUi(
 
             FooterCard(
                 modifier = modifier,
-                viewModel = viewModel,
-                selectedSeatList = selectedSeatList
-            )
+                context = context,
+                selectedSeatList = selectedSeatList,
+                dayDataList = viewModel.dayDataList,
+                hourDataList = viewModel.hourDataList,
+                isLoading = isLoading
+            ) {
+                isLoading = true
+                viewModel.buyTicket(it)
+            }
         }
-
     }
 }
 
 @Composable
 fun FooterCard(
     modifier: Modifier,
-    viewModel: CinemaViewModel,
-    selectedSeatList: List<CinemaSeat>
+    context: Context,
+    selectedSeatList: List<CinemaSeat>,
+    dayDataList: List<WeekDay>,
+    hourDataList : List<String>,
+    isLoading : Boolean,
+    onBuyTicketClick: (BuyTicketRequest) -> Unit
 ) {
     var totalPrice by remember {
-        mutableLongStateOf(selectedSeatList.sumOf { it.price })
+        mutableLongStateOf(0L)
     }
     totalPrice = selectedSeatList.sumOf { it.price }
     var ticketCount by remember {
-        mutableIntStateOf(selectedSeatList.size)
+        mutableIntStateOf(0)
     }
     ticketCount = selectedSeatList.size
 
@@ -212,8 +217,6 @@ fun FooterCard(
         mutableIntStateOf(3)
     }
 
-    val dayDataList = viewModel.dayDataList
-    val hourDataList = viewModel.hourDataList
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -230,7 +233,9 @@ fun FooterCard(
                 repeat(dayDataList.size) {
                     item {
                         DayItem(
-                            modifier = modifier, weekDay = dayDataList[it], selectedDayIndex == it
+                            modifier = modifier,
+                            weekDay = dayDataList[it],
+                            selected = selectedDayIndex == it
                         ) {
                             selectedDayIndex = it
                         }
@@ -246,7 +251,11 @@ fun FooterCard(
                 itemsIndexed(hourDataList, key = { _, item ->
                     item
                 }) { index, data ->
-                    HourItem(modifier = modifier, hour = data, selectedHourIndex == index) {
+                    HourItem(
+                        modifier = modifier,
+                        hour = data,
+                        selected = selectedHourIndex == index
+                    ) {
                         selectedHourIndex = index
                     }
                 }
@@ -283,20 +292,29 @@ fun FooterCard(
                         containerColor = SeatType.Selected.seatColor
                     ),
                     onClick = {
-                        viewModel.buyTicket(
-                            BuyTicketRequest(
-                                seatId = selectedSeatList.joinToString { it.seatId.toString() },
-                                day = dayDataList[selectedDayIndex].dateDayNum.toString(),
-                                hour = hourDataList[selectedHourIndex]
+                        validation(selectedSeatList, context) {
+                            onBuyTicketClick(
+                                BuyTicketRequest(
+                                    seatId = selectedSeatList.joinToString { it.seatId.toString() },
+                                    day = dayDataList[selectedDayIndex].dateDayNum.toString(),
+                                    hour = hourDataList[selectedHourIndex]
+                                )
                             )
-                        )
+                        }
                     })
                 {
 
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_card),
-                        contentDescription = null
-                    )
+                    if (isLoading)
+                        CircularProgressIndicator(
+                            modifier = modifier.size(16.dp),
+                            color = Color.White
+                        )
+                    else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_card),
+                            contentDescription = null
+                        )
+                    }
 
                     Text(
                         modifier = modifier.padding(start = 8.dp),
@@ -329,20 +347,23 @@ fun TextWithIcon(
                 .background(color)
         )
         Text(
-            text = text, fontSize = TextUnit(14f, TextUnitType.Sp), color = Color(0xff656565)
+            text = text,
+            fontSize = TextUnit(14f, TextUnitType.Sp),
+            color = Color(0xff656565)
         )
     }
 }
 
-@Composable
-fun Modifier.curvedTransformation(curvature: Float): Modifier = graphicsLayer(
-    scaleX = 1.5f, // Adjust the scaling factor based on the curvature
-    scaleY = 1f,
-    translationY = curvature * LocalDensity.current.density,
-)
+fun validation(selectedSeatList: List<CinemaSeat>, context: Context, isValid: () -> Unit) {
+    if (selectedSeatList.isNotEmpty()) {
+        isValid.invoke()
+    } else {
+        Toast.makeText(context, "Select a seat please!", Toast.LENGTH_SHORT).show()
+    }
+}
 
 @Preview
 @Composable
 fun Preview() {
-    //ContainerUi()
+    ContainerUi()
 }
