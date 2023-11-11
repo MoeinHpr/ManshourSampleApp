@@ -2,8 +2,6 @@ package com.hpr.cinema
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -58,8 +56,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.hpr.core.util.getBitmapFromImage
 import com.hpr.data.R
 import com.hpr.data.model.cinema.BuyTicketRequest
 import com.hpr.data.model.cinema.CinemaSeat
@@ -126,7 +124,9 @@ fun ContainerUi(
                         .fillMaxWidth()
                         .height(100.dp),
                     // Tried but no result :(
-                    painter = BitmapPainter(getBitmapFromImage(context , R.drawable.projector).asImageBitmap()),
+                    painter = BitmapPainter(
+                        context.getBitmapFromImage(R.drawable.projector).asImageBitmap()
+                    ),
                     contentDescription = null
                 )
 
@@ -194,8 +194,8 @@ fun FooterCard(
     context: Context,
     selectedSeatList: List<CinemaSeat>,
     dayDataList: List<WeekDay>,
-    hourDataList : List<String>,
-    isLoading : Boolean,
+    hourDataList: List<String>,
+    isLoading: Boolean,
     onBuyTicketClick: (BuyTicketRequest) -> Unit
 ) {
     var totalPrice by remember {
@@ -289,7 +289,7 @@ fun FooterCard(
                         containerColor = SeatType.Selected.seatColor
                     ),
                     onClick = {
-                        if (!isLoading){
+                        if (!isLoading) {
                             validation(selectedSeatList, context) {
                                 onBuyTicketClick(
                                     BuyTicketRequest(
@@ -365,29 +365,4 @@ fun validation(selectedSeatList: List<CinemaSeat>, context: Context, isValid: ()
 @Composable
 fun Preview() {
     ContainerUi()
-}
-
-
-private fun getBitmapFromImage(context: Context, drawable: Int): Bitmap {
-
-    // on below line we are getting drawable
-    val db = ContextCompat.getDrawable(context, drawable)
-
-    // in below line we are creating our bitmap and initializing it.
-    val bit = Bitmap.createBitmap(
-        db!!.intrinsicWidth, db.intrinsicHeight, Bitmap.Config.ARGB_8888
-    )
-
-    // on below line we are
-    // creating a variable for canvas.
-    val canvas = Canvas(bit)
-    canvas.translate(0.5f , 0f)
-
-    // on below line we are setting bounds for our bitmap.
-    db.setBounds(0, 0, canvas.width, canvas.height)
-    // on below line we are simply
-    // calling draw to draw our canvas.
-    db.draw(canvas)
-
-    return bit
 }
