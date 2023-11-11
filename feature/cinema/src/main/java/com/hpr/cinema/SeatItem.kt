@@ -1,8 +1,5 @@
 package com.hpr.cinema
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,10 +20,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import com.hpr.data.R
-import com.hpr.data.model.cinema.CinemaSeatComb
 import com.hpr.data.model.cinema.CinemaSeat
+import com.hpr.data.model.cinema.CinemaSeatComb
 import com.hpr.data.model.cinema.SeatType
 
 
@@ -53,23 +49,18 @@ fun SeatItem(
         Icon(
             modifier = Modifier
                 .fillMaxSize()
-                .alpha(0.5f)
-                /*.background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            seatData.leftSeat.seatType.seatCombColor,
-                            seatData.rightSeat.seatType.seatCombColor,
-                        )
-                    )
-                )*/,
+                .alpha(0.5f),
             painter = painterResource(id = R.drawable.ic_seat_combination),
-            tint = seatData.leftSeat.seatType.seatCombColor, //TODO fix this!
+            tint = if (seatData.rightSeat.seatType == SeatType.Selected
+                && seatData.leftSeat.seatType == SeatType.Selected)
+                SeatType.Selected.seatCombColor
+            else SeatType.Available.seatCombColor,
             contentDescription = null
         )
         Row(
             modifier = Modifier
-                .padding(end = 10.dp, start = 10.dp)
-                .matchParentSize(),
+                .padding(end = 16.dp, start = 16.dp)
+                .fillMaxSize(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -129,28 +120,4 @@ fun selectSeatType(seatType: SeatType): SeatType {
         else -> SeatType.Taken
     }
 
-}
-
-private fun getBitmapFromImage(context: Context, drawable: Int): Bitmap {
-
-    // on below line we are getting drawable
-    val db = ContextCompat.getDrawable(context, drawable)
-
-    // in below line we are creating our bitmap and initializing it.
-    val bit = Bitmap.createBitmap(
-        db!!.intrinsicWidth, db.intrinsicHeight, Bitmap.Config.ARGB_8888
-    )
-
-    // on below line we are
-    // creating a variable for canvas.
-    val canvas = Canvas(bit)
-
-    // on below line we are setting bounds for our bitmap.
-    db.setBounds(0, 0, canvas.width, canvas.height)
-
-    // on below line we are simply
-    // calling draw to draw our canvas.
-    db.draw(canvas)
-
-    return bit
 }

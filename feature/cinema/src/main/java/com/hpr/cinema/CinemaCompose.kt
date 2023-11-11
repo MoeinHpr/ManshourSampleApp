@@ -2,6 +2,8 @@ package com.hpr.cinema
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -47,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +58,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hpr.data.R
 import com.hpr.data.model.cinema.BuyTicketRequest
@@ -120,18 +125,10 @@ fun ContainerUi(
                     modifier = modifier
                         .fillMaxWidth()
                         .height(100.dp),
-                    painter = painterResource(id = R.drawable.projector),
+                    // Tried but no result :(
+                    painter = BitmapPainter(getBitmapFromImage(context , R.drawable.projector).asImageBitmap()),
                     contentDescription = null
                 )
-
-                /*Canvas(
-                    modifier = modifier
-                        .fillMaxWidth()
-                ) {
-                    drawImage(
-                        image = projectorImage,
-                    )
-                }*/
 
                 LazyVerticalGrid(
                     modifier = modifier
@@ -292,14 +289,16 @@ fun FooterCard(
                         containerColor = SeatType.Selected.seatColor
                     ),
                     onClick = {
-                        validation(selectedSeatList, context) {
-                            onBuyTicketClick(
-                                BuyTicketRequest(
-                                    seatId = selectedSeatList.joinToString { it.seatId.toString() },
-                                    day = dayDataList[selectedDayIndex].dateDayNum.toString(),
-                                    hour = hourDataList[selectedHourIndex]
+                        if (!isLoading){
+                            validation(selectedSeatList, context) {
+                                onBuyTicketClick(
+                                    BuyTicketRequest(
+                                        seatId = selectedSeatList.joinToString { it.seatId.toString() },
+                                        day = dayDataList[selectedDayIndex].dateDayNum.toString(),
+                                        hour = hourDataList[selectedHourIndex]
+                                    )
                                 )
-                            )
+                            }
                         }
                     })
                 {
@@ -366,4 +365,29 @@ fun validation(selectedSeatList: List<CinemaSeat>, context: Context, isValid: ()
 @Composable
 fun Preview() {
     ContainerUi()
+}
+
+
+private fun getBitmapFromImage(context: Context, drawable: Int): Bitmap {
+
+    // on below line we are getting drawable
+    val db = ContextCompat.getDrawable(context, drawable)
+
+    // in below line we are creating our bitmap and initializing it.
+    val bit = Bitmap.createBitmap(
+        db!!.intrinsicWidth, db.intrinsicHeight, Bitmap.Config.ARGB_8888
+    )
+
+    // on below line we are
+    // creating a variable for canvas.
+    val canvas = Canvas(bit)
+    canvas.translate(0.5f , 0f)
+
+    // on below line we are setting bounds for our bitmap.
+    db.setBounds(0, 0, canvas.width, canvas.height)
+    // on below line we are simply
+    // calling draw to draw our canvas.
+    db.draw(canvas)
+
+    return bit
 }
